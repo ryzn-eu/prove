@@ -17,11 +17,10 @@
             background: #000; 
             border: 2px solid #333; 
             border-radius: 8px; 
-            /* Evita che l'utente selezioni elementi interni */
             user-select: none;
         }
         
-        /* 🚫 BLOCCATA OGNI INTERAZIONE CON IL PLAYER */
+        /* BLOCCO INTERAZIONI PLAYER */
         .tv-wrapper iframe, .tv-wrapper video { 
             position: absolute; 
             top: 0; 
@@ -29,7 +28,56 @@
             width: 100%; 
             height: 100%; 
             border: 0; 
-            pointer-events: none; /* Impedisce click, pausa, e focus sul video */
+            pointer-events: none; /* Impedisce click, skip o pause */
+        }
+        
+        /* 📡 BLACKSCREEN RETRÒ STILE CONNESSIONE ANTENNA */
+        .antenna-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0a0a0a;
+            z-index: 99; /* Copre completamente l'iframe di YouTube */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Courier New', Courier, monospace;
+            pointer-events: none;
+        }
+
+        .antenna-text {
+            color: #00adb5;
+            font-size: 1.4rem;
+            font-weight: bold;
+            letter-spacing: 2px;
+            margin-bottom: 8px;
+            animation: blink 1s infinite;
+        }
+
+        .antenna-subtext {
+            color: #666;
+            font-size: 0.85rem;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        /* Effetto linee di disturbo TV CRT sullo schermo di caricamento */
+        .antenna-overlay::after {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.4) 50%);
+            background-size: 100% 4px;
+            z-index: 100;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
         }
         
         .status { margin: 15px 0; padding: 10px; background: #222; border-left: 5px solid #00adb5; }
@@ -49,9 +97,17 @@
 <div class="container">
     <h1>📺 WebTV Cloud</h1>
 
-    <div class="tv-wrapper" id="player-box">
-        <div style="text-align:center; padding-top:20%;">In attesa di segnale...</div>
+    <div class="tv-wrapper">
+        <div id="player-box">
+            <div style="text-align:center; padding-top:20%;">In attesa di segnale...</div>
+        </div>
+        
+        <div id="antenna-overlay" class="antenna-overlay" style="display: none;">
+            <div class="antenna-text">📡 SINTONIZZAZIONE CANALE...</div>
+            <div class="antenna-subtext">Connessione e Sincronizzazione Live</div>
+        </div>
     </div>
+    
     <div id="status-text" class="status">Sincronizzazione in corso...</div>
 
     <div class="dashboard">
@@ -107,12 +163,11 @@
         push(queueRef, { url, durata, startTime });
         alert("Video aggiunto!");
         
-        // Pulisce i campi input
         document.getElementById('v-url').value = '';
         document.getElementById('v-durata').value = '';
     };
 
-    // LOGICA PLAYER E SINCRONIZZAZIONE
+    // LOGICA PLAYER E SINCRONIZZAZIONE LIVE
     onValue(queueRef, (snapshot) => {
         const queue = snapshot.val() || {};
         const now = Date.now();
@@ -123,7 +178,6 @@
         Object.entries(queue).forEach(([key, v]) => {
             const end = v.startTime + (v.durata * 1000);
             
-            // Aggiorna lista (solo video futuri o in corso)
             if(end > now) {
                 const isCurrent = (now >= v.startTime && now < end);
                 const color = isCurrent ? "#00adb5" : "#fff";
@@ -132,28 +186,36 @@
                 </li>`;
             }
 
-            // Se è il momento di questo video
+            // Se il video deve essere riprodotto ora
             if(now >= v.startTime && now < end) {
                 found = true;
                 
-                // Se il video non è ancora caricato nel DOM, lo inietta
                 if(currentKey !== key) {
                     currentKey = key;
                     
-                    // Calcolo dei secondi già trascorsi rispetto all'inizio stabilito dal DB
+                    // 1. Mostra istantaneamente la schermata nera dell'antenna
+                    const overlay = document.getElementById('antenna-overlay');
+                    if (overlay) {
+                        overlay.style.display = 'flex';
+                        // 2. Nasconde l'overlay dopo esattamente 3 secondi (nascondendo i loghi YT)
+                        setTimeout(() => {
+                            overlay.style.display = 'none';
+                        }, 3000);
+                    }
+                    
+                    // Calcolo esatto del secondo corrente in cui deve trovarsi la live
                     const elapsedSeconds = Math.floor((now - v.startTime) / 1000);
                     
                     if (v.url.includes('youtu')) {
-                        // Estrazione pulita dell'ID YouTube tramite Regex
                         const match = v.url.match(/^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/);
                         const videoId = (match && match[2].length === 11) ? match[2] : '';
                         
-                        // Parametri restrittivi: controls=0 (nasconde UI), disablekb=1 (blocca tastiera), start=elapsedSeconds (allinea con la live)
+                        // start=elapsedSeconds avvia il video già sincronizzato sotto il blackscreen
                         const embedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&controls=0&disablekb=1&fs=0&modestbranding=1&rel=0&start=${elapsedSeconds}`;
                         
                         document.getElementById('player-box').innerHTML = `<iframe src="${embedUrl}" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
                     } else {
-                        // Fallback per file nativi (.mp4 ecc) - utile per scalare l'infrastruttura fuori da YT
+                        // Fallback MP4 nativo
                         document.getElementById('player-box').innerHTML = `<video id="native-player" src="${v.url}" autoplay muted></video>`;
                         const videoEl = document.getElementById('native-player');
                         videoEl.currentTime = elapsedSeconds;
@@ -167,6 +229,7 @@
         if(!found) {
             document.getElementById('player-box').innerHTML = `<div style="text-align:center; padding-top:20%;">Nessun programma in onda.</div>`;
             document.getElementById('status-text').innerText = "In attesa del prossimo contenuto...";
+            document.getElementById('antenna-overlay').style.display = 'none';
             currentKey = null;
         }
     });
