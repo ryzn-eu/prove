@@ -37,7 +37,7 @@
             pointer-events: none; 
         }
         
-        /* 📡 SCHERMATA ANTENNA (Solo Primo Avvio) */
+        /* 📡 SCHERMATA ANTENNA (Sintonizzazione) */
         .antenna-overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: #000000; z-index: 9999; 
@@ -160,10 +160,8 @@
         const antennaOverlay = document.getElementById('antenna-overlay');
 
         if (isFirstBoot) {
-            // Avvio App: Mostra l'Antenna
             antennaOverlay.style.display = 'flex';
         } else {
-            // Cambio Video: Mostra la Pubblicità
             advOverlay.style.display = 'flex';
             if(advVideo) {
                 advVideo.currentTime = 0;
@@ -182,31 +180,32 @@
                     videoId: videoId,
                     playerVars: {
                         'autoplay': 1, 'controls': 0, 'disablekb': 1, 'fs': 0, 'modestbranding': 1, 'rel': 0,
-                        'start': elapsedSeconds, 'iv_load_policy': 3, 'vq': 'hd1080' // Forzatura Qualità HD
+                        'start': elapsedSeconds, 'iv_load_policy': 3, 'vq': 'hd1080'
                     },
                     events: {
                         'onReady': (event) => {
                             if (isFirstBoot) {
-                                event.target.mute(); // Silenzioso al primo avvio per aggirare i blocchi dei browser
+                                event.target.mute();
                             } else {
-                                event.target.unMute(); // Libero dai video successivi
+                                event.target.unMute();
                             }
-                            event.target.setVolume(100); // Volume al massimo
-                            event.target.setPlaybackQuality('hd1080'); // Seconda forzatura qualità HD
+                            event.target.setVolume(100);
+                            event.target.setPlaybackQuality('hd1080');
                             event.target.playVideo();
                         },
                         'onStateChange': (event) => {
                             if (event.data === 1) { // 1 = PLAYING
                                 if (isFirstBoot) {
+                                    // Mantiene il tempo lungo originale per il primo avvio di YouTube
                                     setTimeout(() => {
                                         antennaOverlay.style.display = 'none';
-                                        isFirstBoot = false; // Diventa falso, da ora in poi userà le Pubblicità
+                                        isFirstBoot = false;
                                     }, 4500);
                                 } else {
                                     setTimeout(() => {
                                         advOverlay.style.display = 'none';
                                         if(advVideo) advVideo.pause();
-                                    }, 5000); // Nasconde la pubblicità dopo 5 secondi
+                                    }, 5000);
                                 }
                             }
                         }
@@ -225,7 +224,6 @@
             }
 
         } else {
-            // Player per file MP4 diretti
             document.getElementById('player-box').innerHTML = `<video id="native-player" src="${v.url}" autoplay></video>`;
             const videoEl = document.getElementById('native-player');
             videoEl.currentTime = elapsedSeconds;
@@ -282,57 +280,76 @@
         renderPlayer();
     });
 
-    // --- SISTEMA DI RISINCRONIZZAZIONE ANTI-STANDBY (LIVE SYNC) ---
+    // --- SISTEMA DI RISINCRONIZZAZIONE TELEVISIVA AL RIENTRO NELLA SCHEDA ---
 
-    // 1. Quando l'utente torna sulla scheda, forziamo istantaneamente il video al secondo "Live"
     document.addEventListener("visibilitychange", () => {
-        if (!document.hidden) {
-            forceLiveSync(false);
+        // Quando l'utente esce dalla scheda, blocca i player per risparmiare risorse
+        if (document.hidden) {
+            if (ytPlayerInstance && typeof ytPlayerInstance.pauseVideo === 'function') {
+                ytPlayerInstance.pauseVideo();
+            }
+            const nativePlayer = document.getElementById('native-player');
+            if (nativePlayer) nativePlayer.pause();
+        } 
+        // Quando l'utente RIENTRA nella scheda (Ricollegamento al Canale)
+        else {
+            // Se è il primissimo avvio assoluto della pagina, lascia gestire le tempistiche a startLiveContent
+            if (isFirstBoot) {
+                forceLiveSync();
+            } else {
+                const antennaOverlay = document.getElementById('antenna-overlay');
+                
+                // 1. Mostra subito la schermata antenna (nasconde le interfacce brutte di YouTube)
+                antennaOverlay.style.display = 'flex';
+                
+                // 2. Calcola l'orario reale in diretta e sposta il player in avanti di nascosto
+                forceLiveSync();
+
+                // 3. Rimuove la schermata antenna dopo esattamente 2 SECONDI (2000 ms) come richiesto
+                setTimeout(() => {
+                    antennaOverlay.style.display = 'none';
+                }, 2000);
+            }
         }
     });
 
-    // 2. Controllo passivo: ogni 5 secondi verifica che il player non abbia perso secondi per colpa del browser
+    // Controllo passivo ogni 10 secondi per micro-allineamenti se la scheda resta sempre visibile
     setInterval(() => {
         if (!document.hidden) {
-            forceLiveSync(true); 
+            forceLiveSync(); 
         }
-    }, 5000);
+    }, 10000);
 
-    function forceLiveSync(isPassiveCheck = false) {
-        // Se non c'è un video in riproduzione o non abbiamo dati, interrompi
+    function forceLiveSync() {
         if (!currentKey || !currentQueueData[currentKey]) return;
         
         const now = Date.now();
         const v = currentQueueData[currentKey];
         const end = v.startTime + (v.durata * 1000);
         
-        // Se il programma attuale è finito mentre eravamo in un'altra scheda, ricarica il palinsesto
         if (now >= end) {
-            if (!isPassiveCheck) renderPlayer();
+            renderPlayer();
             return;
         }
 
-        // Calcoliamo a che secondo esatto DOVREBBE essere il video in questo momento
         const exactElapsedSeconds = Math.floor((now - v.startTime) / 1000);
 
-        // --- RISINCRONIZZAZIONE YOUTUBE ---
+        // --- ALLINEAMENTO YOUTUBE ---
         if (ytPlayerInstance && typeof ytPlayerInstance.getCurrentTime === 'function' && v.url.includes('youtu')) {
             const ytTime = ytPlayerInstance.getCurrentTime();
-            // Se il video è sfasato di oltre 3 secondi rispetto alla realtà, lo riallineiamo
-            if (Math.abs(exactElapsedSeconds - ytTime) > 3) {
+            if (Math.abs(exactElapsedSeconds - ytTime) > 2) {
                 ytPlayerInstance.seekTo(exactElapsedSeconds, true);
-                if (!isPassiveCheck) ytPlayerInstance.playVideo();
+                ytPlayerInstance.playVideo();
             }
         } 
-        // --- RISINCRONIZZAZIONE MP4 NATIVO ---
+        // --- ALLINEAMENTO MP4 NATIVO ---
         else {
             const nativePlayer = document.getElementById('native-player');
             if (nativePlayer) {
                 const nativeTime = nativePlayer.currentTime;
-                // Se il video MP4 è sfasato di oltre 3 secondi, lo riallineiamo
-                if (Math.abs(exactElapsedSeconds - nativeTime) > 3) {
+                if (Math.abs(exactElapsedSeconds - nativeTime) > 2) {
                     nativePlayer.currentTime = exactElapsedSeconds;
-                    if (!isPassiveCheck) nativePlayer.play().catch(()=>{});
+                    nativePlayer.play().catch(()=>{});
                 }
             }
         }
