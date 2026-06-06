@@ -3,102 +3,244 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebTV Cloud Automatizzata</title>
+    <title>WebTV Broadcast Control Room</title>
     <style>
-        body { font-family: sans-serif; background: #121212; color: #fff; margin: 0; padding: 20px; }
-        .container { max-width: 900px; margin: 0 auto; }
+        :root {
+            --bg: #0d1117;
+            --panel-bg: #161b22;
+            --accent: #00ffcc;
+            --alert: #ff4444;
+            --text-main: #c9d1d9;
+            --text-muted: #8b949e;
+            --border: #30363d;
+        }
+
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background: var(--bg); 
+            color: var(--text-main); 
+            margin: 0; 
+            padding: 20px;
+            overflow-x: hidden;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+
+        .header h1 { margin: 0; font-size: 1.8rem; color: var(--accent); text-transform: uppercase; letter-spacing: 2px; }
         
-        /* Player TV Responsivo 16:9 */
+        .live-badge {
+            background: rgba(255, 68, 68, 0.2);
+            color: var(--alert);
+            padding: 5px 15px;
+            border: 1px solid var(--alert);
+            border-radius: 20px;
+            font-weight: bold;
+            animation: pulse 2s infinite;
+        }
+
+        /* GRIGLIA PRINCIPALE */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* PANNELLI */
+        .panel { 
+            background: var(--panel-bg); 
+            border: 1px solid var(--border); 
+            border-radius: 8px; 
+            padding: 20px; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        .panel-title { 
+            font-size: 1rem; 
+            color: var(--accent); 
+            margin-top: 0; 
+            margin-bottom: 15px; 
+            border-bottom: 1px dashed var(--border); 
+            padding-bottom: 5px; 
+            text-transform: uppercase; 
+        }
+
+        /* PLAYER TV */
         .tv-wrapper { 
             position: relative; 
             padding-bottom: 56.25%; 
             height: 0; 
             overflow: hidden; 
             background: #000; 
-            border: 2px solid #333; 
+            border: 2px solid #555; 
             border-radius: 8px; 
             user-select: none;
+            box-shadow: 0 0 20px rgba(0, 255, 204, 0.1);
         }
         
-        #player-box {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            z-index: 1;
-        }
+        #player-box { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+        #player-box iframe, #player-box video, #yt-player-element { position: absolute; top: 0; left: 0; width: 100% !important; height: 100% !important; border: 0; pointer-events: none; }
         
-        /* Blocco interazioni assolute su video e iframe */
-        #player-box iframe, #player-box video, #yt-player-element { 
-            position: absolute; 
-            top: 0; 
-            left: 0; 
-            width: 100% !important; 
-            height: 100% !important; 
-            border: 0; 
-            pointer-events: none; 
-        }
-        
-        /* 📡 SCHERMATA ANTENNA (Sintonizzazione) */
+        /* OVERLAYS */
         .antenna-overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: #000000; z-index: 9999; 
-            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            background: #000; z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center;
             font-family: 'Courier New', Courier, monospace; pointer-events: none;
         }
-        .antenna-text { color: #00adb5; font-size: 1.4rem; font-weight: bold; letter-spacing: 2px; margin-bottom: 8px; animation: blink 1s infinite; }
-        .antenna-subtext { color: #666; font-size: 0.85rem; letter-spacing: 1px; text-transform: uppercase; }
+        .antenna-text { color: var(--accent); font-size: 1.5vw; font-weight: bold; letter-spacing: 2px; animation: blink 1s infinite; }
         .antenna-overlay::after { content: " "; position: absolute; top: 0; left: 0; bottom: 0; right: 0; background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.4) 50%); background-size: 100% 4px; z-index: 10000; }
-
-        /* 🎬 OVERLAY PUBBLICITÀ (Solo al cambio programma) */
+        
         .adv-overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: #000000; z-index: 9999; display: flex; justify-content: center; align-items: center;
+            background: #000; z-index: 9999; display: flex; justify-content: center; align-items: center;
             overflow: hidden; pointer-events: none;
         }
-        .adv-overlay video { width: 100%; height: 100%; object-fit: cover; }
-        .adv-badge { position: absolute; top: 15px; left: 15px; background: rgba(0, 0, 0, 0.8); color: #ffcc00; padding: 6px 12px; font-size: 0.75rem; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; border: 1px solid #ffcc00; border-radius: 4px; z-index: 10000; font-family: monospace; }
+        .adv-overlay video { width: 100%; height: 100%; object-fit: cover; filter: grayscale(20%); }
+        .adv-badge { position: absolute; top: 15px; left: 15px; background: rgba(0, 0, 0, 0.8); color: #ffcc00; padding: 6px 12px; font-size: 0.75rem; border: 1px solid #ffcc00; z-index: 10000; font-family: monospace; }
+
+        /* CONTROLLI SIMULATI E INDICATORI */
+        .hardware-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px; }
+        
+        .terminal {
+            background: #050505; color: #0f0; font-family: 'Courier New', monospace; font-size: 0.8rem;
+            padding: 10px; height: 120px; overflow: hidden; border: 1px solid #333; border-radius: 4px;
+            box-shadow: inset 0 0 10px rgba(0,255,0,0.1);
+        }
+        .terminal-line { margin: 2px 0; opacity: 0.8; }
+
+        .geiger-box { background: #1a1a1a; padding: 10px; border: 1px solid #444; border-radius: 4px; }
+        .geiger-title { font-size: 0.7rem; color: #ff9900; text-transform: uppercase; margin-bottom: 5px; }
+        .geiger-value { font-family: monospace; font-size: 1.2rem; color: #fff; }
+        .geiger-bar-container { width: 100%; height: 10px; background: #333; margin-top: 5px; border-radius: 2px; overflow: hidden; }
+        .geiger-bar { height: 100%; width: 50%; background: linear-gradient(90deg, #0f0, #ff9900, #f00); transition: width 0.2s ease; }
+
+        .rf-switches { display: flex; gap: 5px; margin-top: 10px; }
+        .rf-btn { flex: 1; background: #222; border: 1px solid #555; color: var(--text-muted); padding: 5px; font-size: 0.7rem; cursor: pointer; border-radius: 3px; transition: 0.2s; }
+        .rf-btn.active { background: var(--accent); color: #000; font-weight: bold; box-shadow: 0 0 8px rgba(0,255,204,0.5); border-color: var(--accent); }
+
+        /* FORM INPUTS */
+        .form-group { margin-bottom: 15px; }
+        label { display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 5px; text-transform: uppercase; }
+        input { width: 100%; padding: 10px; border-radius: 4px; border: 1px solid var(--border); background: #0d1117; color: white; box-sizing: border-box; font-family: monospace; transition: border 0.3s; }
+        input:focus { border-color: var(--accent); outline: none; }
+        button.btn-primary { width: 100%; padding: 12px; background: var(--accent); color: #000; font-weight: bold; border: none; border-radius: 4px; cursor: pointer; text-transform: uppercase; letter-spacing: 1px; transition: background 0.3s; }
+        button.btn-primary:hover { background: #00cca3; }
+
+        /* PALINSESTO / CODA */
+        .queue-list { list-style: none; padding: 0; margin: 0; max-height: 400px; overflow-y: auto; }
+        .queue-item { 
+            background: #21262d; border: 1px solid var(--border); padding: 12px; 
+            margin-bottom: 8px; border-radius: 4px; font-size: 0.85rem; 
+            display: flex; flex-direction: column; gap: 5px;
+            border-left: 4px solid var(--text-muted);
+        }
+        .queue-item.active { border-left-color: var(--accent); background: rgba(0, 255, 204, 0.05); }
+        .q-times { font-family: monospace; color: var(--accent); font-size: 0.9rem; }
+        .q-title { font-weight: bold; font-size: 1rem; color: #fff; }
+        .q-meta { color: var(--text-muted); font-size: 0.75rem; display: flex; justify-content: space-between; }
+
+        /* UTILS */
+        .status-bar { margin-top: 15px; padding: 10px; background: #21262d; border-radius: 4px; font-family: monospace; font-size: 0.9rem; display: flex; align-items: center; gap: 10px; }
+        .status-dot { width: 10px; height: 10px; background: var(--accent); border-radius: 50%; box-shadow: 0 0 8px var(--accent); }
 
         @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
         
-        .status { margin: 15px 0; padding: 10px; background: #222; border-left: 5px solid #00adb5; }
-        .dashboard { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 30px; }
-        .card { background: #1e1e1e; padding: 20px; border-radius: 8px; }
-        input { width: 100%; padding: 10px; margin: 8px 0; border-radius: 4px; border: 1px solid #444; background: #333; color: white; box-sizing: border-box; }
-        button { width: 100%; padding: 12px; background: #00adb5; color: white; border: none; border-radius: 4px; cursor: pointer; }
-        .queue-list { list-style: none; padding: 0; }
-        .queue-item { padding: 10px; background: #2a2a2a; margin-bottom: 5px; border-radius: 4px; font-size: 0.9em; }
+        /* SCROLLBAR CUSTOM */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg); }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h1>📺 WebTV Cloud</h1>
+<div class="header">
+    <h1>📡 WebTV Cloud | Master Control</h1>
+    <div class="live-badge">TX SECURE LIVE</div>
+</div>
 
-    <div class="tv-wrapper">
-        <div id="player-box"></div>
+<div class="dashboard-grid">
+    <div class="left-col">
+        <div class="tv-wrapper">
+            <div id="player-box"></div>
+            
+            <div id="antenna-overlay" class="antenna-overlay" style="display: none;">
+                <div class="antenna-text">SINC. FREQUENZA IN CORSO...</div>
+                <div style="color: #666; font-size: 0.8rem; margin-top:10px;">DTS LOCK ACQUIRING</div>
+            </div>
+
+            <div id="adv-overlay" class="adv-overlay" style="display: none;">
+                <div class="adv-badge">COMMERCIAL BREAK</div>
+                <video id="adv-video-element" src="https://www.w3schools.com/html/mov_bbb.mp4" loop muted playsinline></video>
+            </div>
+        </div>
         
-        <div id="antenna-overlay" class="antenna-overlay" style="display: none;">
-            <div class="antenna-text">📡 SINTONIZZAZIONE CANALE...</div>
-            <div class="antenna-subtext">Attendere prego</div>
+        <div class="status-bar">
+            <div class="status-dot" id="status-dot"></div>
+            <span id="status-text">In attesa di segnale...</span>
         </div>
 
-        <div id="adv-overlay" class="adv-overlay" style="display: none;">
-            <div class="adv-badge">Pubblicità</div>
-            <video id="adv-video-element" src="https://www.w3schools.com/html/mov_bbb.mp4" loop muted playsinline></video>
+        <div class="hardware-controls">
+            <div class="panel" style="padding: 10px;">
+                <div class="panel-title" style="font-size:0.7rem; margin-bottom:5px;">System Log</div>
+                <div class="terminal" id="sim-terminal">
+                    <div class="terminal-line">> INIT KERNEL... OK</div>
+                    <div class="terminal-line">> AWAITING TX DATA...</div>
+                </div>
+            </div>
+
+            <div class="panel" style="padding: 10px; display:flex; flex-direction:column; justify-content:space-between;">
+                <div class="geiger-box">
+                    <div class="geiger-title">DTS RF RADIATION Level (μSv/h)</div>
+                    <div class="geiger-value" id="geiger-val">0.00</div>
+                    <div class="geiger-bar-container"><div class="geiger-bar" id="geiger-bar"></div></div>
+                </div>
+                <div>
+                    <div class="geiger-title" style="margin-top:10px;">MUX Frequency Band</div>
+                    <div class="rf-switches">
+                        <button class="rf-btn" onclick="switchRF(this)">VHF-III</button>
+                        <button class="rf-btn active" onclick="switchRF(this)">UHF-IV</button>
+                        <button class="rf-btn" onclick="switchRF(this)">SAT-KU</button>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
-    
-    <div id="status-text" class="status">Sincronizzazione canale...</div>
 
-    <div class="dashboard">
-        <div class="card">
-            <h3>Aggiungi Video</h3>
-            <input type="text" id="v-url" placeholder="URL Video (YouTube o MP4)">
-            <input type="number" id="v-durata" placeholder="Durata (secondi)">
-            <button id="btn-add">Aggiungi al Palinsesto</button>
+    <div class="right-col">
+        <div class="panel" style="margin-bottom: 20px;">
+            <h3 class="panel-title">Ingestione Dati (Nuovo Programma)</h3>
+            
+            <div class="form-group">
+                <label>Nome Film / Programma</label>
+                <input type="text" id="v-nome" placeholder="Es: The Matrix - Ep. 1">
+            </div>
+            
+            <div class="form-group">
+                <label>URL Flusso (YouTube o MP4)</label>
+                <input type="text" id="v-url" placeholder="https://...">
+            </div>
+            
+            <div class="form-group">
+                <label>Durata Stimata (Secondi)</label>
+                <input type="number" id="v-durata" placeholder="Es: 3600 (per 1 ora)">
+            </div>
+            
+            <button id="btn-add" class="btn-primary">INSERISCI IN PALINSESTO</button>
         </div>
-        <div class="card">
-            <h3>Coda di Riproduzione</h3>
-            <ul class="queue-list" id="list-queue"></ul>
+
+        <div class="panel">
+            <h3 class="panel-title">Palinsesto Operativo (Coda)</h3>
+            <ul class="queue-list" id="list-queue">
+                </ul>
         </div>
     </div>
 </div>
@@ -133,11 +275,12 @@
     let isFirstBoot = true;         
     let ytPlayerInstance = null;    
 
-    // LOGICA AGGIUNTA VIDEO
+    // LOGICA AGGIUNTA VIDEO (Modificata per includere il nome)
     document.getElementById('btn-add').onclick = async () => {
+        const nome = document.getElementById('v-nome').value || "Programma Senza Titolo";
         const url = document.getElementById('v-url').value;
         const durata = parseInt(document.getElementById('v-durata').value);
-        if(!url || !durata) return alert("Compila tutto!");
+        if(!url || !durata) return alert("Errore: Compila URL e Durata!");
 
         const snapshot = await get(queueRef);
         let startTime = Date.now();
@@ -148,12 +291,17 @@
                 if(end > startTime) startTime = end;
             });
         }
-        push(queueRef, { url, durata, startTime });
+        
+        push(queueRef, { nome, url, durata, startTime });
+        
+        // Reset campi
+        document.getElementById('v-nome').value = '';
         document.getElementById('v-url').value = '';
         document.getElementById('v-durata').value = '';
+        logTerminal(`[INGEST] ${nome} aggiunto alla coda.`);
     };
 
-    // MOTORE DI GESTIONE FLUSSI VIDEO
+    // MOTORE DI GESTIONE FLUSSI VIDEO (Invariato)
     function startLiveContent(v, elapsedSeconds) {
         const advOverlay = document.getElementById('adv-overlay');
         const advVideo = document.getElementById('adv-video-element');
@@ -163,10 +311,7 @@
             antennaOverlay.style.display = 'flex';
         } else {
             advOverlay.style.display = 'flex';
-            if(advVideo) {
-                advVideo.currentTime = 0;
-                advVideo.play().catch(() => {}); 
-            }
+            if(advVideo) { advVideo.currentTime = 0; advVideo.play().catch(() => {}); }
         }
 
         if (v.url.includes('youtu')) {
@@ -175,53 +320,29 @@
             
             const initYTPlayer = () => {
                 document.getElementById('player-box').innerHTML = '<div id="yt-player-element"></div>';
-                
                 ytPlayerInstance = new window.YT.Player('yt-player-element', {
                     videoId: videoId,
-                    playerVars: {
-                        'autoplay': 1, 'controls': 0, 'disablekb': 1, 'fs': 0, 'modestbranding': 1, 'rel': 0,
-                        'start': elapsedSeconds, 'iv_load_policy': 3, 'vq': 'hd1080'
-                    },
+                    playerVars: { 'autoplay': 1, 'controls': 0, 'disablekb': 1, 'fs': 0, 'modestbranding': 1, 'rel': 0, 'start': elapsedSeconds, 'iv_load_policy': 3, 'vq': 'hd1080' },
                     events: {
                         'onReady': (event) => {
-                            if (isFirstBoot) {
-                                event.target.mute();
-                            } else {
-                                event.target.unMute();
-                            }
+                            if (isFirstBoot) event.target.mute(); else event.target.unMute();
                             event.target.setVolume(100);
                             event.target.setPlaybackQuality('hd1080');
                             event.target.playVideo();
+                            logTerminal(`[YOUTUBE] Player inizializzato. ID: ${videoId}`);
                         },
                         'onStateChange': (event) => {
                             if (event.data === 1) { // 1 = PLAYING
-                                if (isFirstBoot) {
-                                    // Mantiene il tempo lungo originale per il primo avvio di YouTube
-                                    setTimeout(() => {
-                                        antennaOverlay.style.display = 'none';
-                                        isFirstBoot = false;
-                                    }, 4500);
-                                } else {
-                                    setTimeout(() => {
-                                        advOverlay.style.display = 'none';
-                                        if(advVideo) advVideo.pause();
-                                    }, 5000);
-                                }
+                                if (isFirstBoot) { setTimeout(() => { antennaOverlay.style.display = 'none'; isFirstBoot = false; }, 4500); } 
+                                else { setTimeout(() => { advOverlay.style.display = 'none'; if(advVideo) advVideo.pause(); }, 5000); }
                             }
                         }
                     }
                 });
             };
 
-            if (typeof window.YT !== 'undefined' && window.YT.Player) {
-                initYTPlayer();
-            } else {
-                const checkReady = setInterval(() => {
-                    if (typeof window.YT !== 'undefined' && window.YT.Player) {
-                        clearInterval(checkReady); initYTPlayer();
-                    }
-                }, 100);
-            }
+            if (typeof window.YT !== 'undefined' && window.YT.Player) initYTPlayer();
+            else { const checkReady = setInterval(() => { if (typeof window.YT !== 'undefined' && window.YT.Player) { clearInterval(checkReady); initYTPlayer(); } }, 100); }
 
         } else {
             document.getElementById('player-box').innerHTML = `<video id="native-player" src="${v.url}" autoplay></video>`;
@@ -231,30 +352,45 @@
             if (isFirstBoot) { videoEl.muted = true; } else { videoEl.muted = false; videoEl.volume = 1.0; }
             
             videoEl.onplaying = () => {
-                if (isFirstBoot) {
-                    setTimeout(() => { antennaOverlay.style.display = 'none'; isFirstBoot = false; }, 1500);
-                } else {
-                    setTimeout(() => { advOverlay.style.display = 'none'; if(advVideo) advVideo.pause(); }, 2000);
-                }
+                logTerminal(`[NATIVE] Streaming MP4 in play.`);
+                if (isFirstBoot) { setTimeout(() => { antennaOverlay.style.display = 'none'; isFirstBoot = false; }, 1500); } 
+                else { setTimeout(() => { advOverlay.style.display = 'none'; if(advVideo) advVideo.pause(); }, 2000); }
             };
         }
     }
 
-    // REGOLATORE PALINSESTO FIREBASE
+    // REGOLATORE PALINSESTO FIREBASE E UI AVANZATA
     function renderPlayer() {
         const now = Date.now();
         const listEl = document.getElementById('list-queue');
         listEl.innerHTML = "";
         
         let found = false;
-        Object.entries(currentQueueData).forEach(([key, v]) => {
+        
+        // Ordina elementi per startTime
+        const sortedItems = Object.entries(currentQueueData).sort((a, b) => a[1].startTime - b[1].startTime);
+
+        sortedItems.forEach(([key, v]) => {
             const end = v.startTime + (v.durata * 1000);
+            
             if(end > now) {
                 const isCurrent = (now >= v.startTime && now < end);
-                const color = isCurrent ? "#00adb5" : "#fff";
-                listEl.innerHTML += `<li class="queue-item" style="color: ${color}">
-                    ${new Date(v.startTime).toLocaleTimeString()} - ${v.url.split('/').pop()}
-                </li>`;
+                const title = v.nome || "Programma";
+                
+                // Formattazione Date per UI
+                const startTimeStr = new Date(v.startTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                const endTimeStr = new Date(end).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                const mins = Math.round(v.durata / 60);
+
+                listEl.innerHTML += `
+                    <li class="queue-item ${isCurrent ? 'active' : ''}">
+                        <div class="q-times">${startTimeStr} - ${endTimeStr} ${isCurrent ? '🔴 [IN ONDA]' : ''}</div>
+                        <div class="q-title">${title}</div>
+                        <div class="q-meta">
+                            <span>Durata: ${mins} min (${v.durata}s)</span>
+                            <span style="opacity:0.5; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:150px;">${v.url.split('/').pop()}</span>
+                        </div>
+                    </li>`;
             }
 
             if(now >= v.startTime && now < end) {
@@ -263,14 +399,19 @@
                     currentKey = key;
                     const elapsedSeconds = Math.floor((now - v.startTime) / 1000);
                     startLiveContent(v, elapsedSeconds);
+                    logTerminal(`[SWITCH] Passaggio segnale a: ${v.nome || key}`);
                 }
-                document.getElementById('status-text').innerText = "🔴 In onda: " + v.url;
+                document.getElementById('status-text').innerText = `🔴 ON AIR: ${v.nome || 'Contenuto in riproduzione'}`;
+                document.getElementById('status-dot').style.background = '#ff4444';
+                document.getElementById('status-dot').style.boxShadow = '0 0 10px #ff4444';
             }
         });
 
         if(!found) {
-            document.getElementById('player-box').innerHTML = `<div style="text-align:center; padding-top:20%;">Nessun programma in onda.</div>`;
-            document.getElementById('status-text').innerText = "In attesa del prossimo contenuto...";
+            document.getElementById('player-box').innerHTML = `<div style="text-align:center; padding-top:20%; color: #666; font-family:monospace;">[ NESSUN SEGNALE IN INGRESSO ]</div>`;
+            document.getElementById('status-text').innerText = "Standby. In attesa del prossimo contenuto...";
+            document.getElementById('status-dot').style.background = 'var(--text-muted)';
+            document.getElementById('status-dot').style.boxShadow = 'none';
             currentKey = null;
         }
     }
@@ -280,82 +421,82 @@
         renderPlayer();
     });
 
-    // --- SISTEMA DI RISINCRONIZZAZIONE TELEVISIVA AL RIENTRO NELLA SCHEDA ---
+    // --- LOGICA SIMULATORI (TERMINALE, GEIGER, RF) ---
+    
+    const terminalEl = document.getElementById('sim-terminal');
+    function logTerminal(msg) {
+        const time = new Date().toLocaleTimeString();
+        terminalEl.innerHTML += `<div class="terminal-line">[${time}] ${msg}</div>`;
+        if(terminalEl.childElementCount > 6) terminalEl.removeChild(terminalEl.firstChild);
+    }
+    
+    setInterval(() => {
+        const msgs = ["Sincronizzazione NTP...", "Ping server CDN...", "Verifica handshake P2P...", "Buffer level: OK"];
+        if(Math.random() > 0.7) logTerminal(`> ${msgs[Math.floor(Math.random()*msgs.length)]}`);
+    }, 4000);
 
+    // Animazione Geiger Counter
+    setInterval(() => {
+        // Genera un valore fluttuante
+        const base = currentKey ? 45.0 : 12.0; // Più alto se in onda
+        const randomFluct = (Math.random() * 15) - 5;
+        let val = base + randomFluct;
+        if(val < 0) val = 0;
+        
+        document.getElementById('geiger-val').innerText = val.toFixed(2);
+        
+        // Aggiorna larghezza barra e colore
+        let percentage = Math.min(100, (val / 80) * 100);
+        document.getElementById('geiger-bar').style.width = percentage + '%';
+    }, 800);
+
+    // Gestione bottoni finti RF
+    window.switchRF = function(btn) {
+        document.querySelectorAll('.rf-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        logTerminal(`[RF] Banda commutata su ${btn.innerText}`);
+    };
+
+    // --- SISTEMA DI RISINCRONIZZAZIONE (Invariato) ---
     document.addEventListener("visibilitychange", () => {
-        // Quando l'utente esce dalla scheda, blocca i player per risparmiare risorse
         if (document.hidden) {
-            if (ytPlayerInstance && typeof ytPlayerInstance.pauseVideo === 'function') {
-                ytPlayerInstance.pauseVideo();
-            }
+            if (ytPlayerInstance && typeof ytPlayerInstance.pauseVideo === 'function') ytPlayerInstance.pauseVideo();
             const nativePlayer = document.getElementById('native-player');
             if (nativePlayer) nativePlayer.pause();
-        } 
-        // Quando l'utente RIENTRA nella scheda (Ricollegamento al Canale)
-        else {
-            // Se è il primissimo avvio assoluto della pagina, lascia gestire le tempistiche a startLiveContent
-            if (isFirstBoot) {
-                forceLiveSync();
-            } else {
+        } else {
+            if (isFirstBoot) forceLiveSync();
+            else {
                 const antennaOverlay = document.getElementById('antenna-overlay');
-                
-                // 1. Mostra subito la schermata antenna (nasconde le interfacce brutte di YouTube)
                 antennaOverlay.style.display = 'flex';
-                
-                // 2. Calcola l'orario reale in diretta e sposta il player in avanti di nascosto
                 forceLiveSync();
-
-                // 3. Rimuove la schermata antenna dopo esattamente 2 SECONDI (2000 ms) come richiesto
-                setTimeout(() => {
-                    antennaOverlay.style.display = 'none';
-                }, 2000);
+                setTimeout(() => { antennaOverlay.style.display = 'none'; }, 2000);
             }
         }
     });
 
-    // Controllo passivo ogni 10 secondi per micro-allineamenti se la scheda resta sempre visibile
-    setInterval(() => {
-        if (!document.hidden) {
-            forceLiveSync(); 
-        }
-    }, 10000);
+    setInterval(() => { if (!document.hidden) forceLiveSync(); }, 10000);
 
     function forceLiveSync() {
         if (!currentKey || !currentQueueData[currentKey]) return;
-        
         const now = Date.now();
         const v = currentQueueData[currentKey];
         const end = v.startTime + (v.durata * 1000);
-        
-        if (now >= end) {
-            renderPlayer();
-            return;
-        }
-
+        if (now >= end) { renderPlayer(); return; }
         const exactElapsedSeconds = Math.floor((now - v.startTime) / 1000);
 
-        // --- ALLINEAMENTO YOUTUBE ---
         if (ytPlayerInstance && typeof ytPlayerInstance.getCurrentTime === 'function' && v.url.includes('youtu')) {
-            const ytTime = ytPlayerInstance.getCurrentTime();
-            if (Math.abs(exactElapsedSeconds - ytTime) > 2) {
+            if (Math.abs(exactElapsedSeconds - ytPlayerInstance.getCurrentTime()) > 2) {
                 ytPlayerInstance.seekTo(exactElapsedSeconds, true);
                 ytPlayerInstance.playVideo();
             }
-        } 
-        // --- ALLINEAMENTO MP4 NATIVO ---
-        else {
+        } else {
             const nativePlayer = document.getElementById('native-player');
-            if (nativePlayer) {
-                const nativeTime = nativePlayer.currentTime;
-                if (Math.abs(exactElapsedSeconds - nativeTime) > 2) {
-                    nativePlayer.currentTime = exactElapsedSeconds;
-                    nativePlayer.play().catch(()=>{});
-                }
+            if (nativePlayer && Math.abs(exactElapsedSeconds - nativePlayer.currentTime) > 2) {
+                nativePlayer.currentTime = exactElapsedSeconds;
+                nativePlayer.play().catch(()=>{});
             }
         }
     }
-
 </script>
-
 </body>
 </html>
