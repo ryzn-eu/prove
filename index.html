@@ -282,6 +282,62 @@
         renderPlayer();
     });
 
+    // --- SISTEMA DI RISINCRONIZZAZIONE ANTI-STANDBY (LIVE SYNC) ---
+
+    // 1. Quando l'utente torna sulla scheda, forziamo istantaneamente il video al secondo "Live"
+    document.addEventListener("visibilitychange", () => {
+        if (!document.hidden) {
+            forceLiveSync(false);
+        }
+    });
+
+    // 2. Controllo passivo: ogni 5 secondi verifica che il player non abbia perso secondi per colpa del browser
+    setInterval(() => {
+        if (!document.hidden) {
+            forceLiveSync(true); 
+        }
+    }, 5000);
+
+    function forceLiveSync(isPassiveCheck = false) {
+        // Se non c'è un video in riproduzione o non abbiamo dati, interrompi
+        if (!currentKey || !currentQueueData[currentKey]) return;
+        
+        const now = Date.now();
+        const v = currentQueueData[currentKey];
+        const end = v.startTime + (v.durata * 1000);
+        
+        // Se il programma attuale è finito mentre eravamo in un'altra scheda, ricarica il palinsesto
+        if (now >= end) {
+            if (!isPassiveCheck) renderPlayer();
+            return;
+        }
+
+        // Calcoliamo a che secondo esatto DOVREBBE essere il video in questo momento
+        const exactElapsedSeconds = Math.floor((now - v.startTime) / 1000);
+
+        // --- RISINCRONIZZAZIONE YOUTUBE ---
+        if (ytPlayerInstance && typeof ytPlayerInstance.getCurrentTime === 'function' && v.url.includes('youtu')) {
+            const ytTime = ytPlayerInstance.getCurrentTime();
+            // Se il video è sfasato di oltre 3 secondi rispetto alla realtà, lo riallineiamo
+            if (Math.abs(exactElapsedSeconds - ytTime) > 3) {
+                ytPlayerInstance.seekTo(exactElapsedSeconds, true);
+                if (!isPassiveCheck) ytPlayerInstance.playVideo();
+            }
+        } 
+        // --- RISINCRONIZZAZIONE MP4 NATIVO ---
+        else {
+            const nativePlayer = document.getElementById('native-player');
+            if (nativePlayer) {
+                const nativeTime = nativePlayer.currentTime;
+                // Se il video MP4 è sfasato di oltre 3 secondi, lo riallineiamo
+                if (Math.abs(exactElapsedSeconds - nativeTime) > 3) {
+                    nativePlayer.currentTime = exactElapsedSeconds;
+                    if (!isPassiveCheck) nativePlayer.play().catch(()=>{});
+                }
+            }
+        }
+    }
+
 </script>
 
 </body>
